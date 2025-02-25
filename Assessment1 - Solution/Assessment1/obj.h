@@ -208,8 +208,9 @@ int mtl_parse(char* filename, vector<Material>* mtls)
 	return 1;
 }
 
-int obj_parse(const char* filename, vector<Object>* objs, float scale)
+int obj_parse(const char* filename, std::vector<triangle>* io_tris)
 {
+	vector<Object> objs;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -223,12 +224,13 @@ int obj_parse(const char* filename, vector<Object>* objs, float scale)
 	std::vector<vertex> vertices;
 	std::vector<uint32_t> indices;
 
-	float max_vert = 0.f;
+/*	float max_vert = 0.f;
 	for (const auto& v : attrib.vertices)
 	{
 		if (v > max_vert)
 			max_vert = 1;
 	}
+	*/
 
 	for (const auto& shape : shapes) 
 	{
@@ -238,9 +240,9 @@ int obj_parse(const char* filename, vector<Object>* objs, float scale)
 
 			vert.pos =
 			{
-				(attrib.vertices[3 * index.vertex_index + 0] / max_vert) * scale,
-				(attrib.vertices[3 * index.vertex_index + 1] / max_vert) * scale,
-				(attrib.vertices[3 * index.vertex_index + 2] / max_vert) * scale, 
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2], 
 				1.f
 			};
 
@@ -286,17 +288,59 @@ int obj_parse(const char* filename, vector<Object>* objs, float scale)
 			tri.v3.col = { r, g, b };
 		}
 
+
+		if (strcmp(filename, "objs/cornell2/cornell-box.obj") == 0)
+		{
+
+			tri.v1.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
+			tri.v2.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
+			tri.v3.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
+
+			if (tri.primID == 6 || tri.primID == 7)
+			{
+				tri.v1.col = vec3(1, 0, 0);
+				tri.v2.col = vec3(1, 0, 0);
+				tri.v3.col = vec3(1, 0, 0);
+			}
+			if (tri.primID == 8 || tri.primID == 9)
+			{
+				tri.v1.col = vec3(0, 1, 0);
+				tri.v2.col = vec3(0, 1, 0);
+				tri.v3.col = vec3(0, 1, 0);
+			}
+			if (tri.primID == 10 || tri.primID == 11)
+			{
+				tri.v1.col = vec3(0, 0, 1);
+				tri.v2.col = vec3(0, 0, 1);
+				tri.v3.col = vec3(0, 0, 1);
+			}
+		}
+
+		if (strcmp(filename, "objs/bird/textured_quad.obj") == 0)
+		{
+			tri.v1.col = vec3(1, 0, 0);
+			tri.v2.col = vec3(1, 0, 0);
+			tri.v3.col = vec3(1, 0, 0);
+		}
+
+
 		obj.tris.push_back(tri);
 	}
 
-	objs->push_back(obj);
+	objs.push_back(obj);
 
-	int num_tris = 0;
-	for (auto& o : *objs)
+
+	for (auto& obj : objs)
 	{
-		num_tris += o.tris.size();
+		io_tris->insert(io_tris->end(), obj.tris.begin(), obj.tris.end());
 	}
-	printf("successfully parsed %s and read %d object(s)  %d triangles \n", filename, objs->size(), num_tris);
+
+//	int num_tris = 0;
+//	for (auto& o : objs)
+//	{
+//		num_tris += o.tris.size();
+//	}
+	printf("successfully parsed %s and read %d object(s)  %d triangles \n", filename, objs.size(), io_tris->size());
 
 }
 /*

@@ -7,7 +7,7 @@
 #define PIXEL_W 1920
 #define PIXEL_H 1080
 
-float display_buffer[PIXEL_W * PIXEL_H * 3];
+float colour_buffer[PIXEL_W * PIXEL_H * 3];
 float depth_buffer[PIXEL_W * PIXEL_H];
 
 

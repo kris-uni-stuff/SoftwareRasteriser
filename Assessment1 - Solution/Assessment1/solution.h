@@ -1,14 +1,24 @@
 #pragma once
+
+#define _USE_MATH_DEFINES 
+#define NOMINMAX
+#include <iostream>
+#include <map>
+#include <vector>
+#include <algorithm>
+
 #include "bmp.h"
 #include "display.h"
 #include "maths.h"
 #include "vertices.h"
 #include "obj.h"
+#include "utility.h"
 
-#include <algorithm>
+#include <../glm/gtc/matrix_transform.hpp>
 
 //glm::vec3 *colour_buffer;
-vec3 clear_col;
+//vec3 clear_col;
+//glm::vec3 light_pos(4.f, 6.f, 4.f);
 
 /*void SetNumSamples(int n)
 {
@@ -24,17 +34,28 @@ void ClearColourBuffer(float col[4])
 	{
 		for (int x = 0; x < PIXEL_W; x++)
 		{
-			display_buffer[(y * PIXEL_W * 3) + (x * 3) + 0] = col[0] * 255.f;
-			display_buffer[(y * PIXEL_W * 3) + (x * 3) + 1] = col[1] * 255.f;
-			display_buffer[(y * PIXEL_W * 3) + (x * 3) + 2] = col[2] * 255.f;
+			colour_buffer[(y * PIXEL_W * 3) + (x * 3) + 0] = col[0] * 255.f;
+			colour_buffer[(y * PIXEL_W * 3) + (x * 3) + 1] = col[1] * 255.f;
+			colour_buffer[(y * PIXEL_W * 3) + (x * 3) + 2] = col[2] * 255.f;
 
 			depth_buffer[(y * PIXEL_W) + x] = FLT_MAX;
 		}
 	}
 	
-	clear_col.r = col[0];
-	clear_col.g = col[1];
-	clear_col.b = col[2];
+//	clear_col.r = col[0];
+//	clear_col.g = col[1];
+//	clear_col.b = col[2];
+}
+
+void ClearDepthBuffer()
+{
+	for (int y = 0; y < PIXEL_H; y++)
+	{
+		for (int x = 0; x < PIXEL_W; x++)
+		{
+			depth_buffer[(y * PIXEL_W) + x] = FLT_MAX;
+		}
+	}
 }
 
 triangle* AssembleTriangles(float* verts, int num_verts, int* num_tris)
@@ -70,37 +91,49 @@ triangle* AssembleTriangles(float* verts, int num_verts, int* num_tris)
 }
 
 
-void Translate(glm::mat4 M, glm::mat4 V, glm::mat4 P, triangle* t)
+void ApplyTransformationMatrix(glm::mat4 T, vector<triangle> &tris)
 {
-	glm::mat4 MV = V * M;
-	glm::mat4 MVP = P * MV;
-	
-	t->v1.pos = MVP * t->v1.pos;
-	t->v1.pos /= t->v1.pos.w;
 
-	t->v2.pos = MVP * t->v2.pos;
-	t->v2.pos /= t->v2.pos.w;
+	for (int t = 0; t < tris.size(); t++)
+	{
+		tris[t].v1.pos = T * tris[t].v1.pos;
 
-	t->v3.pos = MVP * t->v3.pos;
-	t->v3.pos /= t->v3.pos.w;
+		tris[t].v2.pos = T * tris[t].v2.pos;
+
+		tris[t].v3.pos = T * tris[t].v3.pos;
+	}
 }
 
-void TransformToScreenSpace(int w, int h, triangle* t)
+void ApplyPerspectiveDivision(vector<triangle>& tris)
 {
-	int v1sx = (t->v1.pos.x + 1) * w / 2;
-	t->v1.pos.x = v1sx;
-	int v1sy = (t->v1.pos.y + 1) * h / 2;
-	t->v1.pos.y = v1sy;
 
-	int v2sx = (t->v2.pos.x + 1) * w / 2;
-	t->v2.pos.x = v2sx;
-	int v2sy = (t->v2.pos.y + 1) * h / 2;
-	t->v2.pos.y = v2sy;
+	for (int t = 0; t < tris.size(); t++)
+	{
+		tris[t].v1.pos /= tris[t].v1.pos.w;
+		tris[t].v2.pos /= tris[t].v2.pos.w;
+		tris[t].v3.pos /= tris[t].v3.pos.w;
+	}
+}
 
-	int v3sx = (t->v3.pos.x + 1) * w / 2;
-	t->v3.pos.x = v3sx;
-	int v3sy = (t->v3.pos.y + 1) * h / 2;
-	t->v3.pos.y = v3sy;
+void TransformToScreenSpace(int w, int h, vector<triangle> &tris)
+{
+	for (int t = 0; t < tris.size(); t++)
+	{
+		int v1sx = (tris[t].v1.pos.x + 1) * w / 2;
+		tris[t].v1.pos.x = v1sx;
+		int v1sy = (tris[t].v1.pos.y + 1) * h / 2;
+		tris[t].v1.pos.y = v1sy;
+
+		int v2sx = (tris[t].v2.pos.x + 1) * w / 2;
+		tris[t].v2.pos.x = v2sx;
+		int v2sy = (tris[t].v2.pos.y + 1) * h / 2;
+		tris[t].v2.pos.y = v2sy;
+
+		int v3sx = (tris[t].v3.pos.x + 1) * w / 2;
+		tris[t].v3.pos.x = v3sx;
+		int v3sy = (tris[t].v3.pos.y + 1) * h / 2;
+		tris[t].v3.pos.y = v3sy;
+	}
 }
 
 void ComputeBarycentricCoordinates(int px, int py, triangle t, float& alpha, float& beta, float& gamma)
@@ -118,31 +151,18 @@ void ComputeBarycentricCoordinates(int px, int py, triangle t, float& alpha, flo
 	beta = acp / acb;
 	gamma = abp / abc;
 }
+/*
+glm::vec3 Diffuse(glm::vec3 col, glm::vec3 lightDir, glm::vec3 normal)
+{
+	float dotNL = dot(normal, lightDir);
+	dotNL = std::max(dotNL, 0.f);
+	glm::vec3 ret = col * dotNL;
+	return ret;
+}
+*/
 
 void ShadeFragment(triangle tri, float& alpha, float& beta, float& gamma, vec3& col, float &depth)
 {
-	tri.v1.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
-	tri.v2.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
-	tri.v3.col = vec3(tri.primID / 32.f, tri.primID / 32.f, tri.primID / 32.f);
-
-	if (tri.primID == 6 || tri.primID == 7)
-	{
-		tri.v1.col = vec3(1, 0, 0);
-		tri.v2.col = vec3(1, 0, 0);
-		tri.v3.col = vec3(1, 0, 0);
-	}
-	if (tri.primID == 8 || tri.primID == 9)
-	{
-		tri.v1.col = vec3(0, 1, 0);
-		tri.v2.col = vec3(0, 1, 0);
-		tri.v3.col = vec3(0, 1, 0);
-	}
-	if (tri.primID == 10 || tri.primID == 11)
-	{
-		tri.v1.col = vec3(0, 0, 1);
-		tri.v2.col = vec3(0, 0, 1);
-		tri.v3.col = vec3(0, 0, 1);
-	}
 
 
 
@@ -150,29 +170,13 @@ void ShadeFragment(triangle tri, float& alpha, float& beta, float& gamma, vec3& 
 	col.g = (tri.v1.col.y * alpha) + (tri.v2.col.y * beta) + (tri.v3.col.y * gamma);
 	col.b = (tri.v1.col.z * alpha) + (tri.v2.col.z * beta) + (tri.v3.col.z * gamma);
 
+//	vec3 pit = (tri.v1.pos * alpha) + (tri.v2.pos * beta) + (tri.v3.pos * gamma);
+//	vec3 lDir = glm::normalize(light_pos - pit);
+//	col = Diffuse(col, lDir, tri.v1.nor);
+
 	depth = (tri.v1.pos.z * alpha) + (tri.v2.pos.z * beta) + (tri.v3.pos.z * gamma);
 }
 
-void writeCol(vec3 col, int pixel_x, int pixel_y)
-{
-	float r = linear_to_gamma(col.x);
-	float g = linear_to_gamma(col.y);
-	float b = linear_to_gamma(col.z);
-
-
-	float rc = std::clamp(r, .0f, 1.f);
-	float gc = std::clamp(g, .0f, 1.f);
-	float bc = std::clamp(b, .0f, 1.f);
-
-	float pixel_r = rc * 255.f;
-	float pixel_g = gc * 255.f;
-	float pixel_b = bc * 255.f;
-
-	display_buffer[(pixel_y * PIXEL_W * 3) + (pixel_x * 3) + 0] = pixel_r;
-	display_buffer[(pixel_y * PIXEL_W * 3) + (pixel_x * 3) + 1] = pixel_g;
-	display_buffer[(pixel_y * PIXEL_W * 3) + (pixel_x * 3) + 2] = pixel_b;
-
-}
 
 void Rasterise(vector<triangle> tris)
 {
@@ -201,7 +205,7 @@ void Rasterise(vector<triangle> tris)
 					ShadeFragment(tris[t], alpha, beta, gamma, col, depth);
 					if (depth < depth_buffer[(py * PIXEL_W) + px])
 					{
-						writeCol(col, px, PIXEL_H - py);
+						writeColToDisplayBuffer(col, px, PIXEL_H - py);
 						depth_buffer[(py * PIXEL_W) + px] = depth;
 					}
 				}
@@ -211,42 +215,33 @@ void Rasterise(vector<triangle> tris)
 	std::clog << "\rFinish rendering.           \n";
 }
 
-void AppendTriangles(std::vector<triangle>* io, vector<Object> in_objs)
+void render(std::string MODEL_PATH)
 {
-	for (auto& obj : in_objs)
-	{
-		io->insert(io->end(), obj.tris.begin(), obj.tris.end());
-	}
-}
+	float bgd[] = { 1.f, 1.f, 1.f, 1.f };
+	ClearColourBuffer(bgd);
+	ClearDepthBuffer();
 
-void Draw(int num_verts)
-{
-	/*
-	int d = BUFFER_H / PIXEL_H;
-	for (int pixel_y = 0; pixel_y < PIXEL_H; ++pixel_y)
-	{
-		for (int pixel_x = 0; pixel_x < PIXEL_W; ++pixel_x)
-		{
-			float pixel_r = 0;
-			float pixel_g = 0;
-			float pixel_b = 0;
-			for (int offset_y = 0; offset_y < d; ++offset_y)
-			{
-				for (int offset_x = 0; offset_x < d; ++offset_x)
-				{
-					pixel_r += colour_buffer[(((pixel_y * d) + offset_y) * BUFFER_W) + ((pixel_x * d) + offset_x)].x;
-					pixel_g += colour_buffer[(((pixel_y * d) + offset_y) * BUFFER_W) + ((pixel_x * d) + offset_x)].y;
-					pixel_b += colour_buffer[(((pixel_y * d) + offset_y) * BUFFER_W) + ((pixel_x * d) + offset_x)].z;
-				}
-			}
-			int d2 = d * d;
-			pixel_r /= d2;
-			pixel_g /= d2;
-			pixel_b /= d2;
-			display_buffer[pixel_x][pixel_y].x = pixel_r;
-			display_buffer[pixel_x][pixel_y].y = pixel_g;
-			display_buffer[pixel_x][pixel_y].z = pixel_b;
-		}
-	}
-	*/
+	std::vector<triangle> tris;
+	obj_parse(MODEL_PATH.c_str(), &tris);
+
+
+	glm::mat4 M(1);
+	M = glm::translate(M, vec3(0.1, -2.5, -6));
+
+	glm::mat4 V(1);
+
+	glm::mat4 P(1);
+	P = glm::perspective(glm::radians(60.f), (float)PIXEL_W / (float)PIXEL_H, 0.1f, 10.f);
+
+//	glm::mat4 MV = V * M;
+	glm::mat4 MVP = P * V * M;
+
+	ApplyTransformationMatrix(MVP, tris);
+
+	ApplyPerspectiveDivision(tris);
+
+	TransformToScreenSpace(PIXEL_W, PIXEL_H, tris);
+
+	Rasterise(tris);
+
 }
